@@ -75,6 +75,8 @@ def main():
                       help="Random seed.")
   parser.add_argument("--gpu_allow_growth", default=False, action="store_true",
                       help="Allocate GPU memory dynamically.")
+  parser.add_argument("--per_process_gpu_memory_fraction", default=None, type=float,
+                      help="Allocate fraction of GPU memory.")
   args = parser.parse_args()
 
   tf.logging.set_verbosity(getattr(tf.logging, args.log_level))

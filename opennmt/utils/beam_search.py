@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Implemetation of beam seach with penalties."""
+"""Implementation of beam search with penalties."""
 
 from __future__ import absolute_import
 from __future__ import division

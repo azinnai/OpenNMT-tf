@@ -21,7 +21,8 @@ class Runner(object):
                config,
                seed=None,
                num_devices=1,
-               gpu_allow_growth=False):
+               gpu_allow_growth=False,
+               per_process_gpu_memory_fraction=None):
     """Initializes the runner parameters.
 
     Args:
@@ -35,11 +36,15 @@ class Runner(object):
     self._config = config
     self._num_devices = num_devices
 
+    if per_process_gpu_memory_fraction is not None:
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=per_process_gpu_memory_fraction)
+    else:
+        gpu_options = tf.GPUOptions(allow_growth=gpu_allow_growth)
+
     session_config = tf.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=False,
-        gpu_options=tf.GPUOptions(
-            allow_growth=gpu_allow_growth))
+        gpu_options=gpu_options)
     run_config = tf.estimator.RunConfig(
         model_dir=self._config["model_dir"],
         session_config=session_config,

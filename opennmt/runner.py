@@ -38,11 +38,9 @@ class Runner(object):
     self._config = config
     self._num_devices = num_devices
 
-    device_count = {'CPU': 0, 'GPU': 1}
-
     if cpu_only:
-        device_count = {'CPU': 1, 'GPU': 0}
         gpu_options = tf.GPUOptions()
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
     elif per_process_gpu_memory_fraction is not None:
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=per_process_gpu_memory_fraction)
     else:
@@ -51,10 +49,9 @@ class Runner(object):
     session_config = tf.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=False,
-        device_count=device_count,
-        gpu_options=gpu_options,
-        intra_op_parallelism_threads=num_threads,
-        inter_op_parallelism_threads=num_threads)
+        gpu_options=gpu_options)#,
+        #intra_op_parallelism_threads=num_threads,
+        #inter_op_parallelism_threads=num_threads)
     run_config = tf.estimator.RunConfig(
         model_dir=self._config["model_dir"],
         session_config=session_config,
@@ -112,10 +109,9 @@ class Runner(object):
         hooks=train_hooks)
     return train_spec
 
-  def _build_eval_spec(self):
+  def _build_eval_spec(self, mode):
     if "eval" not in self._config:
       self._config["eval"] = {}
-
     eval_hooks = []
     if (self._config["eval"].get("save_eval_predictions", False)
         or self._config["eval"].get("external_evaluators") is not None):
@@ -125,6 +121,7 @@ class Runner(object):
       eval_hooks.append(hooks.SaveEvaluationPredictionHook(
           self._model,
           os.path.join(save_path, "predictions.txt"),
+          mode=mode,
           best_models_dir=save_path,
           post_evaluation_fn=external_evaluation_fn(
               self._config["eval"].get("external_evaluators"),
@@ -149,8 +146,9 @@ class Runner(object):
 
   def train_and_evaluate(self):
     """Runs the training and evaluation loop."""
+    mode = tf.estimator.ModeKeys.TRAIN
     train_spec = self._build_train_spec()
-    eval_spec = self._build_eval_spec()
+    eval_spec = self._build_eval_spec(mode)
     tf.estimator.train_and_evaluate(self._estimator, train_spec, eval_spec)
 
   def train(self):
@@ -163,7 +161,8 @@ class Runner(object):
     """Runs evaluation."""
     if checkpoint_path is not None and os.path.isdir(checkpoint_path):
       checkpoint_path = tf.train.latest_checkpoint(checkpoint_path)
-    eval_spec = self._build_eval_spec()
+    mode = tf.estimator.ModeKeys.EVAL
+    eval_spec = self._build_eval_spec(mode)
     self._estimator.evaluate(
         eval_spec.input_fn, hooks=eval_spec.hooks, checkpoint_path=checkpoint_path)
 

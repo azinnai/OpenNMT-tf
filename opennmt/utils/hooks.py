@@ -103,7 +103,7 @@ class CountersHook(tf.train.SessionRunHook):
 class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
   """Hook that saves the evaluation predictions."""
 
-  def __init__(self, model, output_file, post_evaluation_fn=None, best_models_dir=None):
+  def __init__(self, model, output_file, mode, post_evaluation_fn=None, best_models_dir=None):
     """Initializes this hook.
 
     Args:
@@ -118,6 +118,7 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
     self._post_evaluation_fn = post_evaluation_fn
     self._best_external_scores = [[0, -1]] # list initialization to record external scores
     self._best_models_dir = best_models_dir
+    self._mode = mode
 
 
   def begin(self):
@@ -146,7 +147,7 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
     tf.logging.info("Evaluation predictions saved to %s", self._output_path)
     if self._post_evaluation_fn is not None:
       external_evaluator_scores, external_evaluator_names = self._post_evaluation_fn(self._current_step, self._output_path)
-      if self._best_models_dir and external_evaluator_scores:
+      if self._best_models_dir and external_evaluator_scores and self._mode == tf.estimator.ModeKeys.TRAIN:
         self.save_best_model(external_evaluator_scores, external_evaluator_names, session)
 
   def save_best_model(self, new_scores, evaluator_names, session):

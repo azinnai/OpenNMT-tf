@@ -38,6 +38,8 @@ class ExternalEvaluator(object):
     if self._summary_writer is not None:
       self._summarize_score(step, score)
     self._log_score(score)
+    return score, self.name()
+
 
   # Some evaluators may return several scores so let them the ability to
   # define how to log the score result.
@@ -139,7 +141,12 @@ def external_evaluation_fn(evaluators_name, labels_file, output_dir=None):
     evaluators.append(evaluator)
 
   def _post_evaluation_fn(step, predictions_path):
+    scores = []
+    names = []
     for evaluator in evaluators:
-      evaluator(step, predictions_path)
+      score, name = evaluator(step, predictions_path)
+      scores.append(score)
+      names.append(name)
+    return scores, names
 
   return _post_evaluation_fn

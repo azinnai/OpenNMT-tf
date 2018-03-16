@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+import os
+
 import tensorflow as tf
 
 from opennmt.utils import misc
@@ -101,7 +103,7 @@ class CountersHook(tf.train.SessionRunHook):
 class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
   """Hook that saves the evaluation predictions."""
 
-  def __init__(self, model, output_file, post_evaluation_fn=None):
+  def __init__(self, model, output_file, post_evaluation_fn=None, best_models_dir=None):
     """Initializes this hook.
 
     Args:
@@ -114,20 +116,27 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
     self._model = model
     self._output_file = output_file
     self._post_evaluation_fn = post_evaluation_fn
+    self._best_external_scores = [[0, -1]] # list initialization to record external scores
+    self._best_models_dir = best_models_dir
+
 
   def begin(self):
     self._predictions = misc.get_dict_from_collection("predictions")
+    self._saver = tf.train.Saver()
     if not self._predictions:
       raise RuntimeError("The model did not define any predictions.")
     self._global_step = tf.train.get_global_step()
     if self._global_step is None:
       raise RuntimeError("Global step should be created to use SaveEvaluationPredictionHook.")
+    if not os.path.exists(self._best_models_dir):
+      os.makedirs(self._best_models_dir)
+
 
   def before_run(self, run_context):  # pylint: disable=unused-argument
     return tf.train.SessionRunArgs([self._predictions, self._global_step])
 
   def after_run(self, run_context, run_values):  # pylint: disable=unused-argument
-    predictions, self._current_step = run_values.results
+    predictions, self._current_step= run_values.results
     self._output_path = "{}.{}".format(self._output_file, self._current_step)
     with open(self._output_path, "a") as output_file:
       for prediction in misc.extract_batches(predictions):
@@ -136,4 +145,20 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
   def end(self, session):
     tf.logging.info("Evaluation predictions saved to %s", self._output_path)
     if self._post_evaluation_fn is not None:
-      self._post_evaluation_fn(self._current_step, self._output_path)
+      external_evaluator_scores, external_evaluator_names = self._post_evaluation_fn(self._current_step, self._output_path)
+      if self._best_models_dir and external_evaluator_scores:
+        self.save_best_model(external_evaluator_scores, external_evaluator_names, session)
+
+  def save_best_model(self, new_scores, evaluator_names, session):
+    for new_score, new_evaluator_name in zip(new_scores, evaluator_names):
+      if any(x[1] < new_score for x in self._best_external_scores):
+        self._best_external_scores.append([self._global_step.eval(session), new_score])
+        self._best_external_scores = sorted(self._best_external_scores, key=lambda k: k[1])[:5]
+        save_name = "model.ckpt-{}.{}-{}".format(self._global_step.eval(session), new_evaluator_name, new_score)
+        save_path = os.path.join(self._best_models_dir, save_name)
+        tf.logging.info("Saving new best external evaluator model in {}".format(save_path))
+        tf.logging.info(self._best_external_scores)
+        self._saver.save(session, save_path)
+
+
+

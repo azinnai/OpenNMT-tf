@@ -125,6 +125,7 @@ class Runner(object):
       eval_hooks.append(hooks.SaveEvaluationPredictionHook(
           self._model,
           os.path.join(save_path, "predictions.txt"),
+          best_models_dir=save_path,
           post_evaluation_fn=external_evaluation_fn(
               self._config["eval"].get("external_evaluators"),
               self._config["data"]["eval_labels_file"],

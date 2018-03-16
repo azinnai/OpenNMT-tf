@@ -77,6 +77,11 @@ def main():
                       help="Allocate GPU memory dynamically.")
   parser.add_argument("--per_process_gpu_memory_fraction", default=None, type=float,
                       help="Allocate fraction of GPU memory.")
+  parser.add_argument("--cpu_only", default=False, action="store_true",
+                      help="The program will run on CPU only.")
+  parser.add_argument("--num_threads", default=2,
+                      help="The number of threads to use in CPU mode.")
+
   args = parser.parse_args()
 
   tf.logging.set_verbosity(getattr(tf.logging, args.log_level))
@@ -112,7 +117,9 @@ def main():
       config,
       seed=args.seed,
       num_devices=args.num_gpus,
-      gpu_allow_growth=args.gpu_allow_growth)
+      gpu_allow_growth=args.gpu_allow_growth,
+      cpu_only=args.cpu_only,
+      num_threads=args.num_threads)
 
   if args.run == "train_and_eval":
     runner.train_and_evaluate()

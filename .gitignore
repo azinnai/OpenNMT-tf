@@ -1,1 +1,4 @@
 *.pyc
+*exp*
+run.sh
+.idea

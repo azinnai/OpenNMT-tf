@@ -13,7 +13,6 @@ except ImportError:
   pass
 
 from opennmt.tokenizers.tokenizer import SpaceTokenizer, CharacterTokenizer
-from opennmt.tokenizers.sentencepiece_tokenizer import SentencePieceTokenizer
 
 def add_command_line_arguments(parser):
   """Adds command line arguments to select the tokenizer."""

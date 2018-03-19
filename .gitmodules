@@ -1,3 +1,6 @@
 [submodule "third_party/OpenNMTTokenizer"]
 	path = third_party/OpenNMTTokenizer
 	url = https://github.com/OpenNMT/Tokenizer.git
+[submodule "third_party/mosesdecoder"]
+	path = third_party/mosesdecoder
+	url = git@github.com:moses-smt/mosesdecoder.git

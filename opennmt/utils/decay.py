@@ -69,3 +69,35 @@ def rsqrt_decay(learning_rate,
   warmup_steps = tf.to_float(decay_steps)
 
   return scale * tf.rsqrt(tf.maximum(step, warmup_steps))
+
+
+def linear_decay(learning_rate,
+                global_step,
+                decay_steps,
+                decay_rate,
+                staircase=False,
+                name=None):
+  """Decay based on the reciprocal of the step square root.
+
+  The semantic of the arguments are changed accordingly.
+
+  Args:
+    learning_rate: The scale constant.
+    global_step: The current learning step.
+    decay_steps: The warmup steps.
+    decay_rate: Ignored.
+    staircase: Ignored.
+    name: Ignored.
+
+  Returns:
+    The learning rate for the step :obj:`global_step`.
+  """
+  _ = staircase
+  _ = name
+  _ = tf.to_float(global_step)
+  _ = tf.to_float(decay_steps)
+
+  gradient = tf.to_float(decay_rate)
+  scale = tf.to_float(learning_rate)
+
+  return scale * gradient

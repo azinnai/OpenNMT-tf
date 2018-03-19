@@ -116,7 +116,7 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
     self._model = model
     self._output_file = output_file
     self._post_evaluation_fn = post_evaluation_fn
-    self._best_external_scores = [[0, -1]] # list initialization to record external scores
+    self._best_external_scores = [[0, -1]]  # list initialization to record external scores
     self._best_models_dir = best_models_dir
     self._mode = mode
 
@@ -160,6 +160,3 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
         tf.logging.info("Saving new best external evaluator model in {}".format(save_path))
         tf.logging.info(self._best_external_scores)
         self._saver.save(session, save_path)
-
-
-

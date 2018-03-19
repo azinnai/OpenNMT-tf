@@ -18,9 +18,10 @@ from opennmt.utils.misc import get_third_party_dir
 class ExternalEvaluator(object):
   """Base class for external evaluators."""
 
-  def __init__(self, labels_file=None, output_dir=None):
+  def __init__(self, labels_file=None, output_dir=None, postprocess_script=None):
     self._labels_file = labels_file
     self._summary_writer = None
+    self._postprocess_script = postprocess_script
 
     if output_dir is not None:
       self._summary_writer = SummaryWriterCache.get(output_dir)
@@ -32,6 +33,23 @@ class ExternalEvaluator(object):
       step: The step at which this evaluation occurs.
       predictions_path: The path to the saved predictions.
     """
+    if self._postprocess_script:
+      predictions_path_postprocessed = predictions_path+'.postprocessed'
+      with open(predictions_path, 'r') as predictions_file, \
+              open(predictions_path_postprocessed, 'w') as predictions_file_postprocessed:
+        p = subprocess.Popen(
+              self._postprocess_script,
+              shell=True,
+              stdin=predictions_file,
+              stderr=subprocess.STDOUT,
+              stdout=predictions_file_postprocessed)
+        p.wait()
+        predictions_file_postprocessed.flush()
+        p = subprocess.Popen("sed -i -e '1,2d' "+predictions_path_postprocessed,
+                             shell=True)
+        p.wait()
+      predictions_path = predictions_path_postprocessed
+
     score = self.score(self._labels_file, predictions_path)
     if score is None:
       return
@@ -105,8 +123,31 @@ class BLEUDetokEvaluator(BLEUEvaluator):
   def name(self):
     return "BLEU-detok"
 
+  def score(self, labels_file, predictions_path):
+    bleu_script = self._get_bleu_script()
+    try:
+      third_party_dir = get_third_party_dir()
+    except RuntimeError as e:
+      tf.logging.warning("%s", str(e))
+      return None
+    try:
+      with open(predictions_path, "r") as predictions_file:
+        bleu_out = subprocess.check_output(
+            [os.path.join(third_party_dir, bleu_script), labels_file],
+            stdin=predictions_file,
+            stderr=subprocess.STDOUT)
+        bleu_out = bleu_out.decode("utf-8")
+        bleu_score = re.search(r"BLEU = (.+?),", bleu_out).group(1)
+        return float(bleu_score)
+    except subprocess.CalledProcessError as error:
+      if error.output is not None:
+        msg = error.output.strip()
+        tf.logging.warning(
+            "{} script returned non-zero exit code: {}".format(bleu_script, msg))
+      return None
 
-def external_evaluation_fn(evaluators_name, labels_file, output_dir=None):
+
+def external_evaluation_fn(evaluators_name, labels_file, output_dir=None, postprocess_script=None):
   """Returns a callable to be used in
   :class:`opennmt.utils.hooks.SaveEvaluationPredictionHook` that calls one or
   more external evaluators.
@@ -128,6 +169,8 @@ def external_evaluation_fn(evaluators_name, labels_file, output_dir=None):
     evaluators_name = [evaluators_name]
   if not evaluators_name:
     return None
+  if not os.path.isfile(postprocess_script):
+    raise IOError("Post process script {} not found.".format(postprocess_script))
 
   evaluators = []
   for name in evaluators_name:
@@ -135,7 +178,7 @@ def external_evaluation_fn(evaluators_name, labels_file, output_dir=None):
     if name == "bleu":
       evaluator = BLEUEvaluator(labels_file=labels_file, output_dir=output_dir)
     elif name == "bleu-detok":
-      evaluator = BLEUDetokEvaluator(labels_file=labels_file, output_dir=output_dir)
+      evaluator = BLEUDetokEvaluator(labels_file=labels_file, output_dir=output_dir, postprocess_script=postprocess_script)
     else:
       raise ValueError("No evaluator associated with the name: {}".format(name))
     evaluators.append(evaluator)

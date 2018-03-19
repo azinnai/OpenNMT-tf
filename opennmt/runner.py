@@ -126,6 +126,7 @@ class Runner(object):
           post_evaluation_fn=external_evaluation_fn(
               self._config["eval"].get("external_evaluators"),
               self._config["data"]["eval_labels_file"],
+              postprocess_script=self._config["eval"].get("postprocess_script", None),
               output_dir=self._estimator.model_dir)))
 
     eval_spec = tf.estimator.EvalSpec(

@@ -113,6 +113,8 @@ eval:
   # (optional) Evalutator or list of evaluators that are called on the saved evaluation predictions.
   # Available evaluators: BLEU, BLEU-detok
   external_evaluators: BLEU
+  # external evaluation script: require with BLEU-detok
+  postprocess_script: postporocess-test.sh
 
 # (optional) Inference options.
 infer:

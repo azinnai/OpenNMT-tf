@@ -154,7 +154,7 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
     for new_score, new_evaluator_name in zip(new_scores, evaluator_names):
       if any(x[1] < new_score for x in self._best_external_scores):
         self._best_external_scores.append([self._global_step.eval(session), new_score])
-        self._best_external_scores = sorted(self._best_external_scores, key=lambda k: k[1])[:5]
+        self._best_external_scores = sorted(self._best_external_scores, key=lambda k: k[1])[:10]
         save_name = "model.ckpt-{}.{}-{}".format(self._global_step.eval(session), new_evaluator_name, new_score)
         save_path = os.path.join(self._best_models_dir, save_name)
         tf.logging.info("Saving new best external evaluator model in {}".format(save_path))

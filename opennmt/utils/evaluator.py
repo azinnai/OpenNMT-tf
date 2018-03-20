@@ -176,7 +176,7 @@ def external_evaluation_fn(evaluators_name, labels_file, output_dir=None, postpr
   for name in evaluators_name:
     name = name.lower()
     if name == "bleu":
-      evaluator = BLEUEvaluator(labels_file=labels_file, output_dir=output_dir)
+      evaluator = BLEUEvaluator(labels_file=labels_file, output_dir=output_dir, postprocess_script=postprocess_script)
     elif name == "bleu-detok":
       evaluator = BLEUDetokEvaluator(labels_file=labels_file, output_dir=output_dir, postprocess_script=postprocess_script)
     else:

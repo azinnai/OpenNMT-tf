@@ -324,6 +324,7 @@ class Model(object):
           process_fn,
           num_parallel_calls=num_threads or 1)
       dataset = dataset.apply(data.batch_parallel_dataset(batch_size))
+      dataset = dataset.apply(data.batch_parallel_dataset(batch_size))
 
     if prefetch_buffer_size:
       dataset = dataset.prefetch(prefetch_buffer_size)

@@ -41,13 +41,10 @@ class ExternalEvaluator(object):
               self._postprocess_script,
               shell=True,
               stdin=predictions_file,
-              stderr=subprocess.STDOUT,
               stdout=predictions_file_postprocessed)
         p.wait()
         predictions_file_postprocessed.flush()
-        p = subprocess.Popen("sed -i -e '1,2d' "+predictions_path_postprocessed,
-                             shell=True)
-        p.wait()
+
       predictions_path = predictions_path_postprocessed
 
     score = self.score(self._labels_file, predictions_path)

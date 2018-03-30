@@ -338,7 +338,7 @@ class WordEmbedder(TextInputter):
 
   def visualize(self, log_dir):
     with tf.variable_scope(tf.get_variable_scope(), reuse=True):
-      embeddings = tf.get_variable("w_embs", dtype=self.dtype)
+      embeddings = tf.get_variable("kernel", dtype=self.dtype)
       visualize_embeddings(
           log_dir,
           embeddings,
@@ -350,7 +350,7 @@ class WordEmbedder(TextInputter):
 
   def transform(self, inputs, mode):
     try:
-      embeddings = tf.get_variable("w_embs", dtype=self.dtype, trainable=self.trainable)
+      embeddings = tf.get_variable("kernel", dtype=self.dtype, trainable=self.trainable)
     except ValueError:
       # Variable does not exist yet.
       if self.embedding_file:
@@ -365,17 +365,19 @@ class WordEmbedder(TextInputter):
         shape = None
         initializer = tf.constant(pretrained.astype(self.dtype.as_numpy_dtype()))
       else:
-        shape = [self.vocabulary_size, self.embedding_size]
+        # the shape is transposed in order to let to set tie embeddings,
+        # the embedding matrix is transposed before to be passed to embedding lookup
+        shape = [self.embedding_size, self.vocabulary_size]
         initializer = None
 
       embeddings = tf.get_variable(
-          "w_embs",
+          "kernel",
           shape=shape,
           dtype=self.dtype,
           initializer=initializer,
           trainable=self.trainable)
 
-    outputs = embedding_lookup(embeddings, inputs)
+    outputs = embedding_lookup(tf.transpose(embeddings), inputs)
 
     outputs = tf.layers.dropout(
         outputs,

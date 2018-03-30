@@ -118,11 +118,16 @@ class Runner(object):
       save_path = os.path.join(self._estimator.model_dir, "eval")
       if not os.path.isdir(save_path):
         os.makedirs(save_path)
+
+      if self._config["eval"].get("save_models", False):
+          save_model_path = save_path
+      else:
+          save_model_path = None
       eval_hooks.append(hooks.SaveEvaluationPredictionHook(
           self._model,
           os.path.join(save_path, "predictions.txt"),
           mode=mode,
-          best_models_dir=save_path,
+          best_models_dir=save_model_path,
           post_evaluation_fn=external_evaluation_fn(
               self._config["eval"].get("external_evaluators"),
               self._config["data"]["eval_labels_file"],

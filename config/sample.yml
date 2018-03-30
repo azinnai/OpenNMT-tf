@@ -115,6 +115,9 @@ eval:
   external_evaluators: BLEU
   # external evaluation script: require with BLEU-detok
   postprocess_script: postporocess-test.sh
+  # If true save the model with the external evaluator score
+  save_models: True
+
 
 # (optional) Inference options.
 infer:

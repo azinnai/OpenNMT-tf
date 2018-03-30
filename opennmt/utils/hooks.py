@@ -129,7 +129,7 @@ class SaveEvaluationPredictionHook(tf.train.SessionRunHook):
     self._global_step = tf.train.get_global_step()
     if self._global_step is None:
       raise RuntimeError("Global step should be created to use SaveEvaluationPredictionHook.")
-    if not os.path.exists(self._best_models_dir):
+    if not os.path.exists(self._best_models_dir) and self._best_models_dir is not None:
       os.makedirs(self._best_models_dir)
 
 

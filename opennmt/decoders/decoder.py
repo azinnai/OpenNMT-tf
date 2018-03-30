@@ -7,7 +7,6 @@ import tensorflow as tf
 
 from opennmt.layers.common import embedding_lookup
 
-
 def logits_to_cum_log_probs(logits, sequence_length):
   """Returns the cumulated log probabilities of sequences.
 
@@ -43,13 +42,14 @@ def get_embedding_fn(embedding):
   else:
     return lambda ids: embedding_lookup(embedding, ids)
 
-def build_output_layer(num_units, vocab_size, dtype=None):
+def build_output_layer(num_units, vocab_size, dtype=None, reuse=False):
   """Builds the output projection layer.
 
   Args:
     num_units: The layer input depth.
     vocab_size: The layer output depth.
     dtype: The layer dtype.
+    reuse: If True reuse the embedding parameters
 
   Returns:
     A ``tf.layers.Dense`` instance.
@@ -60,10 +60,14 @@ def build_output_layer(num_units, vocab_size, dtype=None):
   if vocab_size is None:
     raise ValueError("vocab_size must be set to build the output layer")
 
-  with tf.variable_scope("projection"):
-    layer = tf.layers.Dense(vocab_size, use_bias=True, dtype=dtype)
-    layer.build([None, num_units])
-    return layer
+  # define bias to be reused in Dense layer
+  scope = tf.get_variable_scope() if reuse else "projection"
+
+  bias = tf.get_variable("bias", shape=[vocab_size], dtype=dtype)
+  layer = tf.layers.Dense(vocab_size, use_bias=True, dtype=dtype,
+                          _reuse=reuse, _scope=scope)
+  layer.build([None, num_units])
+  return layer
 
 def get_sampling_probability(global_step,
                              read_probability=None,

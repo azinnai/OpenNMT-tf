@@ -17,7 +17,8 @@ class RNNDecoder(Decoder):
                bridge=None,
                cell_class=tf.contrib.rnn.LSTMCell,
                dropout=0.3,
-               residual_connections=False):
+               residual_connections=False,
+               tie_embeddings=False):
     """Initializes the decoder parameters.
 
     Args:
@@ -37,6 +38,14 @@ class RNNDecoder(Decoder):
     self.cell_class = cell_class
     self.dropout = dropout
     self.residual_connections = residual_connections
+    self.tie_embeddings = tie_embeddings
+
+  def _check_embeddings_dimensions(self, inputs):
+      embedding_dim = inputs.get_shape()[-1]
+      assert embedding_dim == self.num_units,  \
+          "If you want to tie the embedding matrix to the output layer, " \
+          "the embedding size and the hidden layer size must be equal."
+
 
   def _init_state(self, zero_state, initial_state=None):
     if initial_state is None:
@@ -85,6 +94,9 @@ class RNNDecoder(Decoder):
     _ = memory
     _ = memory_sequence_length
 
+    if self.tie_embeddings:
+        self._check_embeddings_dimensions(inputs)
+
     batch_size = tf.shape(inputs)[0]
 
     if (sampling_probability is not None
@@ -111,7 +123,8 @@ class RNNDecoder(Decoder):
         dtype=inputs.dtype)
 
     if output_layer is None:
-      output_layer = build_output_layer(self.num_units, vocab_size, dtype=inputs.dtype)
+      output_layer = build_output_layer(self.num_units, vocab_size,
+                                        dtype=inputs.dtype, reuse=self.tie_embeddings)
 
     # With TrainingHelper, project all timesteps at once.
     fused_projection = isinstance(helper, tf.contrib.seq2seq.TrainingHelper)
@@ -159,7 +172,9 @@ class RNNDecoder(Decoder):
         dtype=dtype)
 
     if output_layer is None:
-      output_layer = build_output_layer(self.num_units, vocab_size, dtype=dtype or memory.dtype)
+      output_layer = build_output_layer(self.num_units, vocab_size,
+                                        dtype=dtype or memory.dtype,
+                                        reuse=self.tie_embeddings)
 
     decoder = tf.contrib.seq2seq.BasicDecoder(
         cell,
@@ -216,7 +231,9 @@ class RNNDecoder(Decoder):
         dtype=dtype)
 
     if output_layer is None:
-      output_layer = build_output_layer(self.num_units, vocab_size, dtype=dtype or memory.dtype)
+      output_layer = build_output_layer(self.num_units, vocab_size,
+                                        dtype=dtype or memory.dtype,
+                                        reuse=self.tie_embeddings)
 
     decoder = tf.contrib.seq2seq.BeamSearchDecoder(
         cell,
@@ -267,7 +284,8 @@ class AttentionalRNNDecoder(RNNDecoder):
                output_is_attention=True,
                cell_class=tf.contrib.rnn.LSTMCell,
                dropout=0.3,
-               residual_connections=False):
+               residual_connections=False,
+               tie_embeddings=False):
     """Initializes the decoder parameters.
 
     Args:
@@ -294,7 +312,8 @@ class AttentionalRNNDecoder(RNNDecoder):
         bridge=bridge,
         cell_class=cell_class,
         dropout=dropout,
-        residual_connections=residual_connections)
+        residual_connections=residual_connections,
+        tie_embeddings=tie_embeddings)
     self.attention_mechanism_class = attention_mechanism_class
     self.output_is_attention = output_is_attention
 
@@ -350,7 +369,8 @@ class MultiAttentionalRNNDecoder(RNNDecoder):
                attention_mechanism_class=tf.contrib.seq2seq.LuongAttention,
                cell_class=tf.contrib.rnn.LSTMCell,
                dropout=0.3,
-               residual_connections=False):
+               residual_connections=False,
+               tie_embeddings=False):
     """Initializes the decoder parameters.
 
     Args:
@@ -375,7 +395,8 @@ class MultiAttentionalRNNDecoder(RNNDecoder):
         num_units,
         cell_class=cell_class,
         dropout=dropout,
-        residual_connections=residual_connections)
+        residual_connections=residual_connections,
+        tie_embeddings=tie_embeddings)
 
     attention_layers = attention_layers or [-1]
     attention_layers = [l % num_layers for l in attention_layers]

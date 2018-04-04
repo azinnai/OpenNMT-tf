@@ -46,7 +46,6 @@ class Tokenizer(object):
       metadata: A dictionary containing additional metadata set
         by the user.
     """
-    print(metadata)
     if self._configuration_file_key is not None:
       configuration_file = metadata[self._configuration_file_key]
       with open(configuration_file) as conf_file:

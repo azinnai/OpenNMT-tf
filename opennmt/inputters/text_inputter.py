@@ -2,6 +2,7 @@
 
 import abc
 import collections
+import io
 import os
 import shutil
 import six
@@ -39,19 +40,19 @@ def visualize_embeddings(log_dir, embedding_var, vocabulary_file, num_oov_bucket
   shutil.copy(vocabulary_file, destination)
 
   # Append <unk> tokens.
-  with open(destination, "a") as vocab:
+  with open(destination, mode="ab") as vocab:
     if num_oov_buckets == 1:
-      vocab.write("<unk>\n")
+      vocab.write(b"<unk>\n")
     else:
       for i in range(num_oov_buckets):
-        vocab.write("<unk{}>\n".format(i))
+        vocab.write(tf.compat.as_bytes("<unk%d>\n" % i))
 
   config = projector.ProjectorConfig()
 
   # If the projector file exists, load it.
   target = os.path.join(log_dir, "projector_config.pbtxt")
   if os.path.exists(target):
-    with open(target) as target_file:
+    with io.open(target, encoding="utf-8") as target_file:
       text_format.Merge(target_file.read(), config)
 
   # If this embedding is already registered, just update the metadata path.
@@ -122,7 +123,7 @@ def load_pretrained_embeddings(embedding_file,
   """
   # Map words to ids from the vocabulary.
   word_to_id = collections.defaultdict(list)
-  with open(vocabulary_file) as vocabulary:
+  with io.open(vocabulary_file, encoding="utf-8") as vocabulary:
     count = 0
     for word in vocabulary:
       word = word.strip()
@@ -132,7 +133,7 @@ def load_pretrained_embeddings(embedding_file,
       count += 1
 
   # Fill pretrained embedding matrix.
-  with open(embedding_file) as embedding:
+  with io.open(embedding_file, encoding="utf-8") as embedding:
     pretrained = None
 
     if with_header:
@@ -176,29 +177,40 @@ def tokens_to_chars(tokens):
   def _string_len(token):
     return len(token.decode("utf-8"))
 
-  # Get the length of each token.
-  lengths = tf.map_fn(
-      lambda x: tf.py_func(_string_len, [x], tf.int64),
-      tokens,
-      dtype=tf.int64,
-      back_prop=False)
+  def _apply():
+    # Get the length of each token.
+    lengths = tf.map_fn(
+        lambda x: tf.py_func(_string_len, [x], tf.int64),
+        tokens,
+        dtype=tf.int64,
+        back_prop=False)
 
-  max_length = tf.reduce_max(lengths)
+    max_length = tf.reduce_max(lengths)
 
-  # Add a delimiter between each unicode character.
-  spaced_chars = tf.map_fn(
-      lambda x: tf.py_func(_split_chars, [x, max_length], [tf.string]),
-      tokens,
-      dtype=[tf.string],
-      back_prop=False)
+    # Add a delimiter between each unicode character.
+    spaced_chars = tf.map_fn(
+        lambda x: tf.py_func(_split_chars, [x, max_length], [tf.string]),
+        tokens,
+        dtype=[tf.string],
+        back_prop=False)
 
-  # Split on this delimiter
-  chars = tf.map_fn(
-      lambda x: tf.string_split(x, delimiter=" ").values,
-      spaced_chars,
-      dtype=tf.string,
-      back_prop=False)
+    # Split on this delimiter
+    chars = tf.map_fn(
+        lambda x: tf.string_split(x, delimiter=" ").values,
+        spaced_chars,
+        dtype=tf.string,
+        back_prop=False)
 
+    return chars, lengths
+
+  def _none():
+    chars = tf.constant([], dtype=tf.string)
+    lengths = tf.constant([], dtype=tf.int64)
+    return chars, lengths
+
+  chars, lengths = tf.cond(tf.equal(tf.shape(tokens)[0], 0), true_fn=_none, false_fn=_apply)
+  chars.set_shape([None, None])
+  lengths.set_shape([None])
   return chars, lengths
 
 

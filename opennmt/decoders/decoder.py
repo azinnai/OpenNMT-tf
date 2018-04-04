@@ -66,6 +66,7 @@ def build_output_layer(num_units, vocab_size, dtype=None, reuse=False):
   bias = tf.get_variable("bias", shape=[vocab_size], dtype=dtype)
   layer = tf.layers.Dense(vocab_size, use_bias=True, dtype=dtype,
                           _reuse=reuse, _scope=scope)
+
   layer.build([None, num_units])
   return layer
 

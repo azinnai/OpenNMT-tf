@@ -1,5 +1,6 @@
 """Main library entrypoint."""
 
+import io
 import os
 import sys
 import random
@@ -196,7 +197,7 @@ class Runner(object):
         prefetch_buffer_size=self._config["infer"].get("prefetch_buffer_size", 1))
 
     if predictions_file:
-      stream = open(predictions_file, "w")
+      stream = io.open(predictions_file, encoding="utf-8", mode="w")
     else:
       stream = sys.stdout
 
@@ -211,6 +212,9 @@ class Runner(object):
 
     Args:
       checkpoint_path: The checkpoint path to export. If ``None``, the latest is used.
+
+    Returns:
+      The string path to the exported directory.
     """
     if checkpoint_path is not None and os.path.isdir(checkpoint_path):
       checkpoint_path = tf.train.latest_checkpoint(checkpoint_path)
@@ -219,7 +223,8 @@ class Runner(object):
     if not os.path.isdir(export_dir):
       os.makedirs(export_dir)
 
-    self._estimator.export_savedmodel(
+    return self._estimator.export_savedmodel(
         os.path.join(export_dir, "manual"),
         self._model.serving_input_fn(self._config["data"]),
-        checkpoint_path=checkpoint_path)
+        checkpoint_path=checkpoint_path,
+        strip_default_attrs=True)

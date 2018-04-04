@@ -1,27 +1,86 @@
 # -*- coding: utf-8 -*-
 
+import io
 import os
 import six
 
 import tensorflow as tf
 import numpy as np
 
+from tensorflow.contrib.tensorboard.plugins import projector
+
+from google.protobuf import text_format
+
 from opennmt.constants import PADDING_TOKEN as PAD
 from opennmt.inputters import inputter, text_inputter, record_inputter
 from opennmt.layers import reducer
 from opennmt.utils import data
-from opennmt.utils.misc import item_or_tuple
+from opennmt.utils.misc import item_or_tuple, count_lines
 
 
 class InputterTest(tf.test.TestCase):
 
+  def testVisualizeEmbeddings(self):
+    log_dir = os.path.join(self.get_temp_dir(), "log")
+    if not os.path.exists(log_dir):
+      os.mkdir(log_dir)
+
+    def _create_embedding(name, vocab_filename, num_oov_buckets=1):
+      vocab_size = 10
+      vocab_file = os.path.join(self.get_temp_dir(), vocab_filename)
+      with open(vocab_file, mode="wb") as vocab:
+        for i in range(vocab_size):
+          vocab.write(tf.compat.as_bytes("%d\n" % i))
+      variable = tf.get_variable(name, shape=[vocab_size + num_oov_buckets, 4])
+      return variable, vocab_file
+
+    def _visualize(embedding, vocab_file, num_oov_buckets=1):
+      text_inputter.visualize_embeddings(
+          log_dir, embedding, vocab_file, num_oov_buckets=num_oov_buckets)
+      projector_config = projector.ProjectorConfig()
+      projector_config_path = os.path.join(log_dir, "projector_config.pbtxt")
+      vocab_file = os.path.join(log_dir, os.path.basename(vocab_file))
+      self.assertTrue(os.path.exists(projector_config_path))
+      self.assertTrue(os.path.exists(vocab_file))
+      self.assertEqual(embedding.get_shape().as_list()[0], count_lines(vocab_file))
+      with io.open(projector_config_path, encoding="utf-8") as projector_config_file:
+        text_format.Merge(projector_config_file.read(), projector_config)
+      return projector_config
+
+    # Register an embedding variable.
+    src_embedding, src_vocab_file = _create_embedding("src_emb", "src_vocab.txt")
+    projector_config = _visualize(src_embedding, src_vocab_file)
+    self.assertEqual(1, len(projector_config.embeddings))
+    self.assertEqual(src_embedding.name, projector_config.embeddings[0].tensor_name)
+    self.assertEqual("src_vocab.txt", projector_config.embeddings[0].metadata_path)
+
+    # Register a second embedding variable.
+    tgt_embedding, tgt_vocab_file = _create_embedding(
+        "tgt_emb", "tgt_vocab.txt", num_oov_buckets=2)
+    projector_config = _visualize(tgt_embedding, tgt_vocab_file, num_oov_buckets=2)
+    self.assertEqual(2, len(projector_config.embeddings))
+    self.assertEqual(tgt_embedding.name, projector_config.embeddings[1].tensor_name)
+    self.assertEqual("tgt_vocab.txt", projector_config.embeddings[1].metadata_path)
+
+    # Update an existing embedding variable with another vocabulary path.
+    new_src_vocab_file = os.path.join(self.get_temp_dir(), "src_vocab_new.txt")
+    os.rename(src_vocab_file, new_src_vocab_file)
+    projector_config = _visualize(src_embedding, new_src_vocab_file)
+    self.assertEqual(2, len(projector_config.embeddings))
+    self.assertEqual(src_embedding.name, projector_config.embeddings[0].tensor_name)
+    self.assertEqual("src_vocab_new.txt", projector_config.embeddings[0].metadata_path)
+
   def _testTokensToChars(self, tokens, expected_chars, expected_lengths):
     expected_chars = [[tf.compat.as_bytes(c) for c in w] for w in expected_chars]
-    chars, lengths = text_inputter.tokens_to_chars(tf.constant(tokens))
+    tokens = tf.placeholder_with_default(tokens, shape=[None])
+    chars, lengths = text_inputter.tokens_to_chars(tokens)
     with self.test_session() as sess:
       chars, lengths = sess.run([chars, lengths])
-      self.assertAllEqual(expected_chars, chars)
-      self.assertAllEqual(expected_lengths, lengths)
+      self.assertListEqual(expected_chars, chars.tolist())
+      self.assertListEqual(expected_lengths, lengths.tolist())
+
+  def testTokensToCharsEmpty(self):
+    self._testTokensToChars([], [], [])
 
   def testTokensToCharsSingle(self):
     self._testTokensToChars(["Hello"], [["H", "e", "l", "l", "o"]], [5])
@@ -36,15 +95,15 @@ class InputterTest(tf.test.TestCase):
     embedding_file = os.path.join(self.get_temp_dir(), "embedding.txt")
     vocab_file = os.path.join(self.get_temp_dir(), "vocab.txt")
 
-    with open(embedding_file, "w") as embedding:
-      embedding.write("toto 1 1\n"
-                      "titi 2 2\n"
-                      "tata 3 3\n")
-    with open(vocab_file, "w") as vocab:
-      vocab.write("Toto\n"
-                  "tOTO\n"
-                  "tata\n"
-                  "tete\n")
+    with io.open(embedding_file, encoding="utf-8", mode="w") as embedding:
+      embedding.write(u"toto 1 1\n"
+                      u"titi 2 2\n"
+                      u"tata 3 3\n")
+    with io.open(vocab_file, encoding="utf-8", mode="w") as vocab:
+      vocab.write(u"Toto\n"
+                  u"tOTO\n"
+                  u"tata\n"
+                  u"tete\n")
 
     embeddings = text_inputter.load_pretrained_embeddings(
         embedding_file,
@@ -70,16 +129,16 @@ class InputterTest(tf.test.TestCase):
     embedding_file = os.path.join(self.get_temp_dir(), "embedding.txt")
     vocab_file = os.path.join(self.get_temp_dir(), "vocab.txt")
 
-    with open(embedding_file, "w") as embedding:
-      embedding.write("3 2\n"
-                      "toto 1 1\n"
-                      "titi 2 2\n"
-                      "tata 3 3\n")
-    with open(vocab_file, "w") as vocab:
-      vocab.write("Toto\n"
-                  "tOTO\n"
-                  "tata\n"
-                  "tete\n")
+    with io.open(embedding_file, encoding="utf-8", mode="w") as embedding:
+      embedding.write(u"3 2\n"
+                      u"toto 1 1\n"
+                      u"titi 2 2\n"
+                      u"tata 3 3\n")
+    with io.open(vocab_file, encoding="utf-8", mode="w") as vocab:
+      vocab.write(u"Toto\n"
+                  u"tOTO\n"
+                  u"tata\n"
+                  u"tete\n")
 
     embeddings = text_inputter.load_pretrained_embeddings(
         embedding_file,
@@ -119,13 +178,13 @@ class InputterTest(tf.test.TestCase):
     vocab_file = os.path.join(self.get_temp_dir(), "vocab.txt")
     data_file = os.path.join(self.get_temp_dir(), "data.txt")
 
-    with open(vocab_file, "w") as vocab:
-      vocab.write("the\n"
-                  "world\n"
-                  "hello\n"
-                  "toto\n")
-    with open(data_file, "w") as data:
-      data.write("hello world !\n")
+    with io.open(vocab_file, encoding="utf-8", mode="w") as vocab:
+      vocab.write(u"the\n"
+                  u"world\n"
+                  u"hello\n"
+                  u"toto\n")
+    with io.open(data_file, encoding="utf-8", mode="w") as data:
+      data.write(u"hello world !\n")
 
     embedder = text_inputter.WordEmbedder("vocabulary_file", embedding_size=10)
     features, transformed = self._makeDataset(
@@ -148,14 +207,14 @@ class InputterTest(tf.test.TestCase):
     vocab_file = os.path.join(self.get_temp_dir(), "vocab.txt")
     data_file = os.path.join(self.get_temp_dir(), "data.txt")
 
-    with open(vocab_file, "w") as vocab:
-      vocab.write("h\n"
-                  "e\n"
-                  "l\n"
-                  "w\n"
-                  "o\n")
-    with open(data_file, "w") as data:
-      data.write("hello world !\n")
+    with io.open(vocab_file, encoding="utf-8", mode="w") as vocab:
+      vocab.write(u"h\n"
+                  u"e\n"
+                  u"l\n"
+                  u"w\n"
+                  u"o\n")
+    with io.open(data_file, encoding="utf-8", mode="w") as data:
+      data.write(u"hello world !\n")
 
     embedder = text_inputter.CharConvEmbedder("vocabulary_file", 10, 5)
     features, transformed = self._makeDataset(
@@ -180,13 +239,13 @@ class InputterTest(tf.test.TestCase):
     vocab_file = os.path.join(self.get_temp_dir(), "vocab.txt")
     data_file = os.path.join(self.get_temp_dir(), "data.txt")
 
-    with open(vocab_file, "w") as vocab:
-      vocab.write("the\n"
-                  "world\n"
-                  "hello\n"
-                  "toto\n")
-    with open(data_file, "w") as data:
-      data.write("hello world !\n")
+    with io.open(vocab_file, encoding="utf-8", mode="w") as vocab:
+      vocab.write(u"the\n"
+                  u"world\n"
+                  u"hello\n"
+                  u"toto\n")
+    with io.open(data_file, encoding="utf-8", mode="w") as data:
+      data.write(u"hello world !\n")
 
     data_files = [data_file, data_file]
 
@@ -219,19 +278,19 @@ class InputterTest(tf.test.TestCase):
     vocab_alt_file = os.path.join(self.get_temp_dir(), "vocab_alt.txt")
     data_file = os.path.join(self.get_temp_dir(), "data.txt")
 
-    with open(vocab_file, "w") as vocab:
-      vocab.write("the\n"
-                  "world\n"
-                  "hello\n"
-                  "toto\n")
-    with open(vocab_alt_file, "w") as vocab_alt:
-      vocab_alt.write("h\n"
-                      "e\n"
-                      "l\n"
-                      "w\n"
-                      "o\n")
-    with open(data_file, "w") as data:
-      data.write("hello world !\n")
+    with io.open(vocab_file, encoding="utf-8", mode="w") as vocab:
+      vocab.write(u"the\n"
+                  u"world\n"
+                  u"hello\n"
+                  u"toto\n")
+    with io.open(vocab_alt_file, encoding="utf-8", mode="w") as vocab_alt:
+      vocab_alt.write(u"h\n"
+                      u"e\n"
+                      u"l\n"
+                      u"w\n"
+                      u"o\n")
+    with io.open(data_file, encoding="utf-8", mode="w") as data:
+      data.write(u"hello world !\n")
 
     mixed_inputter = inputter.MixedInputter([
         text_inputter.WordEmbedder("vocabulary_file_1", embedding_size=10),

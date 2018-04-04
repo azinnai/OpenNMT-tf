@@ -17,9 +17,10 @@ class Vocab(object):
     self._token_to_id = {}
     self._id_to_token = []
     self._frequency = []
+    self._special_tokens = special_tokens
 
-    if special_tokens is not None:
-      for index, token in enumerate(special_tokens):
+    if self._special_tokens is not None:
+      for index, token in enumerate(self._special_tokens):
         self._token_to_id[token] = index
         self._id_to_token.insert(index, token)
 
@@ -135,3 +136,75 @@ class Vocab(object):
       new_vocab._frequency.append(frequency)  # pylint: disable=protected-access
 
     return new_vocab
+
+  def prune_embeddings(self, embeddings_path, embedding_dim=300):
+    new_vocab = Vocab(self._special_tokens)
+    embeddings_keys = self._load_embeddings_keys(embeddings_path)
+
+    idx = 0
+    for i, token in enumerate(self._id_to_token):
+      if token in embeddings_keys:
+        frequency = self._frequency[i]
+
+        new_vocab._token_to_id[token] = idx  # pylint: disable=protected-access
+        new_vocab._id_to_token.append(token)  # pylint: disable=protected-access
+        new_vocab._frequency.append(frequency)  # pylint: disable=protected-access
+
+    pruned_embeddings_keys = [x for x in new_vocab._token_to_id.keys()]
+    embeddings = self._load_embeddings(embeddings_path, pruned_embeddings_keys)
+
+    embeddings_path = embeddings_path.split('.')
+    path, lang = ".".join(embeddings_path[:-1]), embeddings_path[-1]
+    save_path = path+'.pruned.'+lang
+    self._serialize_embeddings(embeddings, save_path, embedding_dim)
+    return new_vocab
+
+  def _serialize_embeddings(self, embeddings, output_path, embedding_dim):
+    with open(output_path, 'w') as output_file:
+      for token, embedding in embeddings.items():
+        if len(embedding) == embedding_dim:
+          output_file.write("{} {}\n".format(token, " ".join(embedding)))
+
+  @staticmethod
+  def _load_embeddings(embeddings_path, embeddings_keys):
+    embeddings = {}
+    with open(embeddings_path, 'r') as embeddings_file:
+      header = next(embeddings_file).strip().split()
+      first_line = next(embeddings_file).strip().split()
+
+      if len(header) == len(first_line):
+        key = header[0]
+        embedding = header[1:]
+        if key in embeddings_keys:
+          embeddings[key] = embedding
+
+      key = first_line[0]
+      embedding = first_line[1:]
+      if key in embeddings_keys:
+        embeddings[key] = embedding
+
+      for line in embeddings_file:
+        line = line.strip().split()
+        key = line[0]
+        embedding = line[1:]
+        if key in embeddings_keys:
+          embeddings[key] = embedding
+
+    return embeddings
+
+  @staticmethod
+  def _load_embeddings_keys(embeddings_path):
+    embeddings_keys = set()
+    with open(embeddings_path, 'r') as embeddings_file:
+      header = next(embeddings_file).strip().split()
+      first_line = next(embeddings_file).strip().split()
+
+      if len(header) == len(first_line):
+        embeddings_keys.add(header[0])
+      embeddings_keys.add(first_line[0])
+
+      for line in embeddings_file:
+        line = line.split()
+        token = line[0]
+        embeddings_keys.add(token)
+    return embeddings_keys

@@ -374,8 +374,9 @@ class WordEmbedder(TextInputter):
             case_insensitive_embeddings=self.case_insensitive_embeddings)
         self.embedding_size = pretrained.shape[-1]
 
+        pretrained = np.transpose(pretrained)
         shape = [self.embedding_size, self.vocabulary_size]
-        initializer = tf.constant_initializer(pretrained.astype(self.dtype.as_numpy_dtype()))
+        initializer = tf.constant_initializer(pretrained.astype(self.dtype.as_numpy_dtype()), verify_shape=True)
       else:
         # the shape is transposed in order to let to set tie embeddings,
         # the embedding matrix is transposed before to be passed to embedding lookup

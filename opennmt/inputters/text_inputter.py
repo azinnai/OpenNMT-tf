@@ -412,7 +412,6 @@ class WordEmbedder(TextInputter):
         outputs,
         rate=self.dropout,
         training=mode == tf.estimator.ModeKeys.TRAIN)
-    print(outputs.get_shape)
     return outputs
 
 

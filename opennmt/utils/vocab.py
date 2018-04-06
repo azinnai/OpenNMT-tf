@@ -137,7 +137,7 @@ class Vocab(object):
 
     return new_vocab
 
-  def prune_embeddings(self, embeddings_path, embedding_dim=300):
+  def prune_embeddings(self, embeddings_path, embedding_size):
     new_vocab = Vocab(self._special_tokens)
     embeddings_keys = self._load_embeddings_keys(embeddings_path)
 
@@ -156,13 +156,13 @@ class Vocab(object):
     embeddings_path = embeddings_path.split('.')
     path, lang = ".".join(embeddings_path[:-1]), embeddings_path[-1]
     save_path = path+'.pruned.'+lang
-    self._serialize_embeddings(embeddings, save_path, embedding_dim)
+    self._serialize_embeddings(embeddings, save_path, embedding_size)
     return new_vocab
 
-  def _serialize_embeddings(self, embeddings, output_path, embedding_dim):
+  def _serialize_embeddings(self, embeddings, output_path, embedding_size):
     with open(output_path, 'w') as output_file:
       for token, embedding in embeddings.items():
-        if len(embedding) == embedding_dim:
+        if len(embedding) == embedding_size: # check for bad length embeddings
           output_file.write("{} {}\n".format(token, " ".join(embedding)))
 
   @staticmethod

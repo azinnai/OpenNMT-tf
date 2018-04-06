@@ -26,7 +26,12 @@ def main():
       help="If set, do not add special sequence tokens (start, end) in the vocabulary.")
   parser.add_argument(
       "--pretrained_embeddings",
+      default=None,
       help="A text file containing pretrained embeddings, in the format [token dim1 ... dimN] per each line.")
+  parser.add_argument(
+      "--embedding_size",
+      default=None,
+      help="The size of the pretrained embeddings, required if --pretrained_embeddings is specified")
 
   tokenizers.add_command_line_arguments(parser)
   args = parser.parse_args()
@@ -43,9 +48,11 @@ def main():
     vocab.add_from_text(data_file, tokenizer=tokenizer)
   vocab = vocab.prune(max_size=args.size, min_frequency=args.min_frequency)
   vocab.serialize(args.save_vocab)
-
+  assert (args.pretrained_embeddings == args.embedding_size) or \
+         (args.pretrained_embeddings is not None and args.embedding_size is not None), \
+      "If pretrained_embeddings is set you must set also the embedding size"
   if args.pretrained_embeddings:
-    vocab = vocab.prune_embeddings(args.pretrained_embeddings)
+    vocab = vocab.prune_embeddings(args.pretrained_embeddings, args.embedding_size)
   #vocab.serialize(args.save_vocab+'.pruned')
 
 if __name__ == "__main__":

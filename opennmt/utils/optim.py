@@ -6,6 +6,15 @@ from opennmt.utils import decay
 from opennmt.utils import adafactor
 
 
+def entry_stop_gradients(target, mask):
+    mask_h = tf.logical_not(mask)
+
+    mask = tf.cast(mask, dtype=target.dtype)
+    mask_h = tf.cast(mask_h, dtype=target.dtype)
+
+    return tf.stop_gradient(mask_h * target) + mask * target
+
+
 def learning_rate_decay_fn(decay_type,
                            decay_rate,
                            decay_steps,

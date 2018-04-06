@@ -19,6 +19,7 @@ from opennmt.inputters.inputter import Inputter
 from opennmt.utils.misc import count_lines
 from opennmt.constants import PADDING_TOKEN
 from opennmt.layers.common import embedding_lookup
+from opennmt.utils.optim import entry_stop_gradients
 
 
 def visualize_embeddings(log_dir, embedding_var, vocabulary_file, num_oov_buckets=1):
@@ -76,7 +77,7 @@ def load_pretrained_embeddings(embedding_file,
                                vocabulary_file,
                                num_oov_buckets=1,
                                with_header=True,
-                               case_insensitive_embeddings=True):
+                               case_insensitive_embeddings=False):
   """Returns pretrained embeddings relative to the vocabulary.
 
   The :obj:`embedding_file` must have the following format:
@@ -132,6 +133,7 @@ def load_pretrained_embeddings(embedding_file,
       word_to_id[word].append(count)
       count += 1
 
+  not_train_indices = []
   # Fill pretrained embedding matrix.
   with io.open(embedding_file, encoding="utf-8") as embedding:
     pretrained = None
@@ -150,10 +152,11 @@ def load_pretrained_embeddings(embedding_file,
       # Lookup word in the vocabulary.
       if word in word_to_id:
         ids = word_to_id[word]
+        not_train_indices.extend(ids)
         for index in ids:
           pretrained[index] = np.asarray(fields[1:])
 
-  return pretrained
+  return pretrained, not_train_indices
 
 def tokens_to_chars(tokens):
   """Splits a list of tokens into unicode characters.
@@ -363,18 +366,27 @@ class WordEmbedder(TextInputter):
   def transform(self, inputs, mode):
     try:
       embeddings = tf.get_variable("kernel", dtype=self.dtype, trainable=self.trainable)
+      mask = np.ones(embeddings.get_shape)
     except ValueError:
       # Variable does not exist yet.
       if self.embedding_file:
-        pretrained = load_pretrained_embeddings(
+        # In the case the pretrained embeddings are less than the vocab,
+        # we want to train only the random inizialized one.
+        # A mask is used to stop the gradient.
+        pretrained, not_train_indices = load_pretrained_embeddings(
             self.embedding_file,
             self.vocabulary_file,
             num_oov_buckets=self.num_oov_buckets,
             with_header=self.embedding_file_with_header,
             case_insensitive_embeddings=self.case_insensitive_embeddings)
-        self.embedding_size = pretrained.shape[-1]
+
+        mask = np.ones(pretrained.shape)
+        for idx in not_train_indices:
+          mask[idx, :] = np.zeros(pretrained.shape[1])
 
         pretrained = np.transpose(pretrained)
+        mask = np.transpose(mask)
+        self.embedding_size = pretrained.shape[0]
         shape = [self.embedding_size, self.vocabulary_size]
         initializer = tf.constant_initializer(pretrained.astype(self.dtype.as_numpy_dtype()), verify_shape=True)
       else:
@@ -382,6 +394,7 @@ class WordEmbedder(TextInputter):
         # the embedding matrix is transposed before to be passed to embedding lookup
         shape = [self.embedding_size, self.vocabulary_size]
         initializer = None
+        mask = np.ones(shape)
 
       embeddings = tf.get_variable(
           "kernel",
@@ -390,13 +403,16 @@ class WordEmbedder(TextInputter):
           initializer=initializer,
           trainable=self.trainable)
 
-    outputs = embedding_lookup(tf.transpose(embeddings), inputs)
+    embeddings = entry_stop_gradients(embeddings, mask)
+    embeddings = tf.transpose(embeddings)
+
+    outputs = embedding_lookup(embeddings, inputs)
 
     outputs = tf.layers.dropout(
         outputs,
         rate=self.dropout,
         training=mode == tf.estimator.ModeKeys.TRAIN)
-
+    print(outputs.get_shape)
     return outputs
 
 

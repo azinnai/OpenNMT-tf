@@ -16,6 +16,9 @@ def add_prefix_to_words(file_path, prefix):
     with open(file_path) as f, open(save_path, 'w') as output:
         for line in f:
             line = line.strip().split()
+            if len(line) < 1:
+                output.write('\n')
+                continue
             new_line = [prefix + line[0]]
 
             is_embedding = True if len(line) > 90 else False

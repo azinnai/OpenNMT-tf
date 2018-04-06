@@ -25,7 +25,7 @@ class Runner(object):
                gpu_allow_growth=False,
                per_process_gpu_memory_fraction=None,
                cpu_only=False,
-               num_threads=2):
+               num_threads=4):
     """Initializes the runner parameters.
 
     Args:
@@ -50,9 +50,9 @@ class Runner(object):
     session_config = tf.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=False,
-        gpu_options=gpu_options)#,
-        #intra_op_parallelism_threads=num_threads,
-        #inter_op_parallelism_threads=num_threads)
+        gpu_options=gpu_options,
+        intra_op_parallelism_threads=num_threads,
+        inter_op_parallelism_threads=num_threads)
     run_config = tf.estimator.RunConfig(
         model_dir=self._config["model_dir"],
         session_config=session_config,

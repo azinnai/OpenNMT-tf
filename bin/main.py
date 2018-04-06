@@ -79,7 +79,7 @@ def main():
                       help="Allocate fraction of GPU memory.")
   parser.add_argument("--cpu_only", default=False, action="store_true",
                       help="The program will run on CPU only.")
-  parser.add_argument("--num_threads", default=2, type=int,
+  parser.add_argument("--num_threads", default=4, type=int,
                       help="The number of threads to use in CPU mode.")
 
   args = parser.parse_args()
@@ -118,6 +118,7 @@ def main():
       seed=args.seed,
       num_devices=args.num_gpus,
       gpu_allow_growth=args.gpu_allow_growth,
+      per_process_gpu_memory_fraction=args.per_process_gpu_memory_fraction,
       cpu_only=args.cpu_only,
       num_threads=args.num_threads)
 

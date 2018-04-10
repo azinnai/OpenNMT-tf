@@ -366,12 +366,12 @@ class WordEmbedder(TextInputter):
   def transform(self, inputs, mode):
     try:
       embeddings = tf.get_variable("kernel", dtype=self.dtype, trainable=self.trainable)
-      mask = np.ones(embeddings.get_shape)
+      mask = np.ones(embeddings.get_shape().as_list())
     except ValueError:
       # Variable does not exist yet.
       if self.embedding_file:
         # In the case the pretrained embeddings are less than the vocab,
-        # we want to train only the random inizialized one.
+        # we want to train only the random inizialized ones.
         # A mask is used to stop the gradient.
         pretrained, not_train_indices = load_pretrained_embeddings(
             self.embedding_file,
@@ -403,7 +403,8 @@ class WordEmbedder(TextInputter):
           initializer=initializer,
           trainable=self.trainable)
 
-    embeddings = entry_stop_gradients(embeddings, mask)
+    if self.embedding_file:
+      embeddings = entry_stop_gradients(embeddings, mask)
     embeddings = tf.transpose(embeddings)
 
     outputs = embedding_lookup(embeddings, inputs)

@@ -80,5 +80,6 @@ for prefix in $train $devel
   python $subword_nmt/apply_bpe.py -c model/$SRC$TRG.bpe < data/$prefix.tc.$TRG > data/$prefix.bpe.$bpe_operations.$TRG &
  done
 wait
+
 # build network dictionary
 PYTHONPATH=../ python -m bin.build_vocab data/train.bpe.$bpe_operations.$SRC data/train.bpe.$bpe_operations.$TRG --save_vocab data/vocab.bpe.$bpe_operations.$SRC$TRG

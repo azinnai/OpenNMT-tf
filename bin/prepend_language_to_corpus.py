@@ -8,7 +8,8 @@ def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def add_prefix_to_words(file_path, prefix):
+def add_prefix_to_words(file_path, prefix, to_stdout=False):
+
     prefix = prefix+'_'
     file_path_splitted = file_path.split('.')
     path, lang = ".".join(file_path_splitted[:-1]), file_path_splitted[-1]
@@ -17,7 +18,10 @@ def add_prefix_to_words(file_path, prefix):
         for line in f:
             line = line.strip().split()
             if len(line) < 1:
-                output.write('\n')
+                if to_stdout:
+                    print()
+                else:
+                    output.write('\n')
                 continue
             new_line = [prefix + line[0]]
 
@@ -28,7 +32,11 @@ def add_prefix_to_words(file_path, prefix):
                     new_line.append(prefix + token)
             else:
                 new_line.extend(line[1:])
-            output.write(" ".join(new_line) + '\n')
+            to_write = " ".join(new_line)
+            if to_stdout:
+                print(to_write)
+            else:
+                output.write(to_write + '\n')
 
 
 def main():
@@ -41,6 +49,10 @@ def main():
                         required=True,
                         nargs='+',
                         help="The list of prefix to add to the corpus files")
+    parser.add_argument("--stdout",
+                        action='store_true',
+                        default=False,
+                        help="Print results to stdout.")
 
     args = parser.parse_args()
 
@@ -52,9 +64,9 @@ def main():
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
     p = Pool(len(corpora), init_worker)
     signal.signal(signal.SIGINT, original_sigint_handler)
-
+    out = [args.stdout]*len(corpora)
     try:
-        p.starmap(add_prefix_to_words, zip(corpora, prefixes))
+        p.starmap(add_prefix_to_words, zip(corpora, prefixes, out))
     except KeyboardInterrupt:
         print('Parent process received ctrl-c')
         p.terminate()

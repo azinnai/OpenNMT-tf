@@ -9,4 +9,4 @@ lng=it
 sed 's/\@\@ //g' | \
 $mosesdecoder/scripts/recaser/detruecase.perl | \
 $mosesdecoder/scripts/tokenizer/detokenizer.perl -l $lng |
-sed -e 's/ <\/s>//g'
+sed -e 's/ <\/s>//g' | sed -e 's/[a-z,A-Z]*_//g'

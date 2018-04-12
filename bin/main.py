@@ -9,6 +9,7 @@ import tensorflow as tf
 
 from opennmt.runner import Runner
 from opennmt.config import load_model, load_config
+from shutil import copy2
 
 
 def _prefix_paths(prefix, paths):
@@ -110,6 +111,8 @@ def main():
   if not os.path.isdir(config["model_dir"]):
     tf.logging.info("Creating model directory %s", config["model_dir"])
     os.makedirs(config["model_dir"])
+    copy2(args.config, config["model_dir"])
+    copy2(args.model, config["model_dir"])
 
   model = load_model(config["model_dir"], model_file=args.model)
   runner = Runner(
